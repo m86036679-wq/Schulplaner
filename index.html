@@ -1,47 +1,765 @@
 <!doctype html>
-<html lang="de">
-<head>
-<meta charset="utf-8">
+<html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Schulplaner</title>
+<title>Max' Schulplaner</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Schulplaner">
+<meta name="theme-color" content="#ffffff">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="favicon.png">
-<meta name="theme-color" content="#3b5bfd">
-<style>
-:root{--bg:#fff;--ink:#14161c;--muted:#646a78;--accent:#3b5bfd;color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{--bg:#14161c;--ink:#f2f3f6;--muted:#a3a9b8}}
-html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,system-ui,sans-serif}
-main{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px max(16px,env(safe-area-inset-left));text-align:center}
-img{width:96px;height:96px;border-radius:22px}
-h1{margin:0;font-size:26px}
-p{margin:0;color:var(--muted);max-width:30ch}
-a.btn{background:var(--accent);color:#fff;text-decoration:none;font-weight:700;padding:14px 24px;border-radius:14px}
-ol{text-align:left;color:var(--muted);margin:0;padding-left:20px;max-width:32ch}
-</style>
-</head>
-<body>
-<main id="m">
-  <img src="apple-touch-icon.png" alt="">
-  <h1>Max' Schulplaner</h1>
-  <p id="t">Wird geöffnet …</p>
-  <a class="btn" id="go" href="https://claude.ai/artifact/8TK2D7jinx1C4aGnwy94x2">Schulplaner öffnen</a>
-  <ol id="how" hidden>
-    <li>Teilen-Symbol in Safari antippen</li>
-    <li>„Zum Home-Bildschirm“ wählen</li>
-    <li>Hinzufügen</li>
-  </ol>
-</main>
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <script>
-var url="https://claude.ai/artifact/8TK2D7jinx1C4aGnwy94x2";
-if(location.search.indexOf("install")>-1){
-  // Installationsmodus: nicht weiterleiten, gespeicherte Adresse ohne ?install
-  document.getElementById("t").textContent="Zum Installieren:";
-  document.getElementById("how").hidden=false;
-  try{history.replaceState(null,"",location.pathname)}catch(e){}
-}else{
-  location.replace(url);
-}
+/* Lokale Datenschicht: liest data.json (von Claude aktualisiert), eigene Änderungen (erledigt, neue Einträge) bleiben im Browser */
+(function(){
+  var DATA=null, L={}, LS="sp_v1_";
+  function rd(k,d){try{var v=JSON.parse(localStorage.getItem(LS+k));return v||d}catch(e){return d}}
+  function wr(k,v){try{localStorage.setItem(LS+k,JSON.stringify(v))}catch(e){}}
+  function ov(c){var o=rd("ov_"+c,{});o.patch=o.patch||{};o.full=o.full||{};o.del=o.del||[];return o}
+  function docs(c){
+    var base=(DATA&&DATA[c])||{},o=ov(c),m={},k;
+    for(k in base)m[k]=base[k];
+    for(k in o.patch)if(m[k])m[k]=Object.assign({},m[k],o.patch[k]);
+    for(k in o.full)m[k]=o.full[k];
+    o.del.forEach(function(i){delete m[i]});
+    return m;
+  }
+  function emit(c){
+    var m=docs(c),list=Object.keys(m).map(function(id){var d=m[id];return{id:id,data:function(){return d}}});
+    (L[c]||[]).forEach(function(f){try{f({docs:list,metadata:{fromCache:false}})}catch(e){}});
+  }
+  function load(){
+    var done=function(j){DATA=j;["eintraege","lernzettel","briefing"].forEach(emit)};
+    return fetch("data.json?t="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json()})
+      .then(function(j){try{localStorage.setItem(LS+"data",JSON.stringify(j))}catch(e){}done(j)})
+      .catch(function(){var j=rd("data",null);if(j)done(j);else{(L._err||[]).forEach(function(f){f()})}});
+  }
+  function col(c){
+    return{
+      onSnapshot:function(ok,err){(L[c]=L[c]||[]).push(ok);if(err)(L._err=L._err||[]).push(err);if(DATA)emit(c)},
+      add:function(d){var id="u"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),o=ov(c);o.full[id]=d;wr("ov_"+c,o);emit(c);return Promise.resolve({id:id})},
+      doc:function(id){return{
+        update:function(p){var o=ov(c);if(o.full[id])o.full[id]=Object.assign({},o.full[id],p);else o.patch[id]=Object.assign({},o.patch[id]||{},p);wr("ov_"+c,o);emit(c);return Promise.resolve()},
+        set:function(d){var o=ov(c);o.full[id]=d;delete o.patch[id];o.del=o.del.filter(function(x){return x!==id});wr("ov_"+c,o);emit(c);return Promise.resolve()},
+        delete:function(){var o=ov(c);if(o.del.indexOf(id)<0)o.del.push(id);delete o.full[id];delete o.patch[id];wr("ov_"+c,o);emit(c);return Promise.resolve()}
+      }}
+    };
+  }
+  window.claude={use:function(n){return Promise.resolve(n==="db"?{collection:col}:null)}};
+  load();
+})();
 </script>
-</body>
-</html>
+</head><body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: helles Weiß, Fächer als Farbcodes. Oben Überblick, dann "Als Nächstes" + Monat, Lernzettel als Blatt im Overlay */
+:root{
+  --bg:#ffffff; --soft:#f5f6f8; --ink:#14161c; --muted:#646a78; --line:#e7e9ee;
+  --accent:#3b5bfd; --accent-soft:#eef1ff;
+  --ok:#1a8a4a; --ok-soft:#e8f6ee; --warn:#b26a00; --warn-soft:#fff4e0; --bad:#c43328; --bad-soft:#fdecea;
+  --display:"Familjen Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",ui-sans-serif,system-ui,sans-serif;
+  color-scheme:light;
+}
+html,body{background:var(--bg)}
+body{color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1120px;margin:0 auto;padding-block:28px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1{font-size:clamp(30px,5vw,44px);font-weight:700;line-height:1.05}
+h2{font-size:20px;font-weight:700}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:16px}
+.status{font-size:13px;color:var(--muted)}
+.overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:720px){.overview{grid-template-columns:minmax(0,1fr)}}
+.ov{background:var(--soft);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.ov .big{font-family:var(--display);font-size:26px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.ov .small{font-size:13px;color:var(--muted)}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px}
+.bar span{display:block;height:100%;background:var(--ok);border-radius:99px}
+button{font:inherit;cursor:pointer;color:inherit}
+.btn{background:var(--ink);color:#fff;border:0;border-radius:10px;padding:10px 18px;font-weight:700}
+.btn.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:6px 12px;font-size:13px;border-radius:8px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:28px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+section{display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:4px 12px;font-size:13px}
+.filters button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{display:grid;grid-template-columns:54px minmax(0,1fr);gap:14px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--bg);position:relative;overflow:hidden}
+.item::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--fc,var(--accent))}
+.date{text-align:center;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:center}
+.date .wd{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.date .d{font-family:var(--display);font-weight:700;font-size:26px;line-height:1.05}
+.date .m{font-size:12px;color:var(--muted)}
+.top{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.fach{font-family:var(--display);font-weight:700;font-size:17px}
+.chip{font-size:12px;border-radius:99px;padding:2px 9px;background:var(--soft);color:var(--muted);font-weight:700}
+.in{font-size:12px;font-weight:700;color:var(--muted)}
+.in.soon{color:var(--bad)}
+.sub{color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.zs{font-size:12px;font-weight:700;border-radius:8px;padding:5px 10px;border:0}
+.zs.fertig{background:var(--ok-soft);color:var(--ok)}
+.zs.offen{background:var(--warn-soft);color:var(--warn)}
+.zs.fehlt{background:var(--bad-soft);color:var(--bad)}
+.link{background:none;border:0;padding:0;color:var(--muted);font-size:13px;text-decoration:underline;text-underline-offset:2px}
+.empty{color:var(--muted);font-size:14px;padding:18px;border:1px dashed var(--line);border-radius:14px}
+.calwrap{border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.wdh{font-size:11px;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px}
+.day{min-height:78px;border-radius:10px;padding:5px;display:flex;flex-direction:column;gap:3px;background:var(--soft);min-width:0;text-align:left;border:1px solid transparent}
+.day.out{background:transparent;color:var(--muted)}
+.day.out .n{opacity:.5}
+.day.today{border-color:var(--ink);background:var(--bg)}
+.day .n{font-size:12px;font-variant-numeric:tabular-nums;font-weight:700}
+.ev{font-size:11px;line-height:1.3;border-radius:5px;padding:1px 5px;background:var(--fc);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.ev{color:var(--ft,#fff)}
+.ev.test{background:var(--bg);color:var(--ink);border:2px dashed var(--fc);padding:0 4px}
+.ev.done{opacity:.45;text-decoration:line-through}
+:root{--ka:#d6336c;--test:#f08c00;--ref:#7048e8}
+.chip.ka{background:var(--ink);color:#fff}
+.chip.test,.chip.ref{background:var(--bg);color:var(--ink);border:2px dashed var(--muted)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:700}
+.legend .lg-ka::before,.legend .lg-t::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;box-sizing:border-box}
+.legend .lg-ka::before{background:var(--ink)}
+.legend .lg-t::before{border:2px dashed var(--ink)}
+.ev[data-id]{cursor:pointer}
+@media (max-width:520px){.day{min-height:50px}.ev{font-size:0;height:6px;padding:0}.ev.test{height:6px;padding:0}}
+.formcard{border:1px solid var(--line);border-radius:16px;padding:18px}
+form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
+@media (max-width:720px){form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:700;min-width:0}
+.wide{grid-column:1/-1}
+input,select,textarea{font:inherit;font-weight:400;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0}
+textarea{min-height:64px;resize:vertical}
+.formacts{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.note{font-size:13px;color:var(--muted)}
+/* Lernzettel-Blatt */
+.sheet{position:fixed;inset:0;background:rgba(20,22,28,.35);display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;z-index:20;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.paper{background:var(--bg);border-radius:18px;max-width:760px;width:100%;box-shadow:0 20px 60px rgba(20,22,28,.18);overflow:hidden}
+.phead{padding:22px 26px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:start;position:relative}
+.phead::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:var(--fc,var(--accent))}
+.pbody{padding:22px 26px 30px;max-width:68ch}
+.pbody h3{font-size:19px;margin:22px 0 8px}
+.pbody h3:first-child{margin-top:0}
+.pbody h4{font-family:var(--display);font-size:16px;margin:16px 0 6px}
+.pbody p{margin:0 0 10px}
+.pbody ul{margin:0 0 12px;padding-left:20px}
+.pbody li{margin:3px 0}
+.pbody .merke{background:var(--accent-soft);border-radius:10px;padding:10px 14px;margin:10px 0}
+.pbody .fehlt{background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:10px 14px;margin:10px 0}
+.pbody strong{font-weight:700}
+.pfoot{padding:0 26px 22px;font-size:13px;color:var(--muted)}
+.item{cursor:pointer;transition:border-color .15s}
+.item:hover{border-color:var(--fc,var(--accent))}
+.tabs{display:flex;gap:4px;padding:0 26px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;padding:12px 12px 10px;font-weight:700;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--fc,var(--accent))}
+.pane{padding:22px 26px 30px}
+.flash{display:flex;flex-direction:column;gap:14px;align-items:center}
+.card{width:100%;min-height:220px;border-radius:16px;border:1px solid var(--line);background:var(--soft);display:flex;align-items:center;justify-content:center;text-align:center;padding:26px;font-size:19px;line-height:1.4;cursor:pointer;font-family:var(--display);font-weight:600}
+.card.back{background:var(--bg);border-color:var(--fc,var(--accent));font-family:var(--body);font-weight:400;font-size:16px}
+.card small{display:block;font-size:12px;color:var(--muted);font-family:var(--body);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
+.cardnav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+.count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.btn.good{background:var(--ok)} .btn.again{background:var(--warn)}
+.q{display:flex;flex-direction:column;gap:12px}
+.q h3{font-size:18px;font-family:var(--display)}
+.opt{text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:12px 14px;font-size:15px}
+.opt:hover:not(:disabled){border-color:var(--ink)}
+.opt.right{background:var(--ok-soft);border-color:var(--ok);color:var(--ok);font-weight:700}
+.opt.wrong{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.expl{background:var(--soft);border-radius:10px;padding:10px 14px;font-size:14px}
+.score{font-family:var(--display);font-size:40px;font-weight:700}
+.aufg{display:flex;flex-direction:column;gap:18px}
+.aufg .frage{border:1px solid var(--line);border-radius:14px;padding:16px}
+.aufg .fn{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.aufg .ft{font-size:15px;margin-bottom:12px;white-space:pre-wrap}
+.aufg input{width:100%;max-width:220px}
+.aufg .result{margin-top:10px;border-radius:10px;padding:10px 14px;font-size:14px;display:none}
+.aufg .result.ok{display:block;background:var(--ok-soft);color:var(--ok)}
+.aufg .result.bad{display:block;background:var(--bad-soft);color:var(--bad)}
+.aufg .result .weg{color:var(--ink);margin-top:6px;white-space:pre-wrap}
+.aufg .frage.done input{border-color:var(--line);background:var(--bg)}
+details.formcard summary{cursor:pointer;font-family:var(--display);font-weight:700;font-size:17px}
+.searchbar{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:8px;margin-top:12px}
+@media (max-width:720px){.searchbar{grid-template-columns:1fr 1fr}}
+.fotoarea{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.fotoacts{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.fotopreview{display:flex;gap:10px;flex-wrap:wrap}
+.fotopreview img{width:90px;height:120px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.fo-thumb{position:relative}
+.fo-thumb button{position:absolute;top:-6px;right:-6px;background:var(--bad);color:#fff;border:0;border-radius:99px;width:20px;height:20px;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+.fo-sheet{border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:4px}
+.fo-sheet h3{font-size:16px;margin-bottom:8px}
+.fo-sheet ul{margin:0;padding-left:18px;font-size:14px}
+.fo-sheet li{margin:4px 0}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:99px;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.brief{border:1px solid var(--line);border-radius:16px;padding:18px}
+.bnow h3{font-size:16px;margin:0}
+.bnow ul{margin:6px 0 0;padding-left:20px}
+.bnow li{margin:4px 0}
+.bfach{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:14px}
+.bf{border:1px solid var(--line);border-radius:14px;padding:12px 14px 12px 18px;position:relative;overflow:hidden;min-width:0;font-size:14px}
+.bf::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--fc)}
+.bf-h{display:flex;justify-content:space-between;gap:8px;align-items:baseline;font-family:var(--display);font-weight:700;font-size:16px}
+.bf p{margin:6px 0}
+.bf ul{margin:4px 0;padding-left:18px}
+.bf .fazit{background:var(--soft);border-radius:8px;padding:6px 10px}
+.src{font-size:12px;color:var(--muted);font-weight:400;font-family:var(--body)}
+.brief-toggle{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;cursor:pointer}
+.brief-toggle h2{margin:0;flex:1}
+.brief-toggle:focus-visible{outline:2px solid currentColor;outline-offset:4px;border-radius:8px}
+.brief-toggle .chev{transition:transform .2s}
+.brief-toggle[aria-expanded="true"] .chev{transform:rotate(180deg)}
+#brief-body{margin-top:14px}
+#brief-body[hidden]{display:none}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Schuljahr 2026/27</div>
+      <h1>Max' Schulplaner</h1>
+    </div>
+    <span class="status" id="status">Lädt …</span>
+  </header>
+
+  <div class="overview" id="overview">
+    <div class="ov"><span class="eyebrow">Nächste Arbeit</span><span class="big" id="ov-next">–</span><span class="small" id="ov-next-s">Noch nichts eingetragen</span></div>
+    <div class="ov"><span class="eyebrow">Diese Woche + nächste</span><span class="big" id="ov-two">0</span><span class="small">Prüfungen in den nächsten 14 Tagen</span></div>
+    <div class="ov"><span class="eyebrow">Lernzettel fertig</span><span class="big" id="ov-z">0 / 0</span><div class="bar"><span id="ov-bar" style="width:0%"></span></div></div>
+  </div>
+
+  <section class="brief" id="brief" aria-labelledby="h-brief">
+    <button type="button" class="brief-toggle" id="brief-toggle" aria-expanded="false" aria-controls="brief-body"><h2 id="h-brief">Tagesbriefing</h2><span class="count" id="brief-stand"></span><span class="chev" aria-hidden="true">▾</span></button>
+    <div id="brief-body" hidden></div>
+  </section>
+
+  <div class="grid">
+    <section aria-labelledby="h-next">
+      <div class="row">
+        <h2 id="h-next">Als Nächstes</h2>
+        <div class="filters" role="group" aria-label="Filter">
+          <button type="button" data-f="alle" aria-pressed="true">Alle</button>
+          <button type="button" data-f="pruef" aria-pressed="false">Prüfungen</button>
+          <button type="button" data-f="ha" aria-pressed="false">Hausaufgaben</button>
+        </div>
+      </div>
+      <div class="list" id="list"><p class="empty">Noch nichts eingetragen. Unten den ersten Termin hinzufügen.</p></div>
+
+      <details class="formcard" id="suchbox">
+        <summary id="h-suche">Alle Klassenarbeiten &amp; Tests durchsuchen</summary>
+        <div class="searchbar">
+          <input type="search" id="sq-text" placeholder="Suche nach Titel, Thema, Fach …">
+          <select id="sq-fach"><option value="">Alle Fächer</option></select>
+          <select id="sq-art">
+            <option value="">Klassenarbeit + Test</option>
+            <option value="Klassenarbeit">Nur Klassenarbeiten</option>
+            <option value="Test">Nur Tests</option>
+            <option value="Referat">Nur Referate</option>
+          </select>
+          <select id="sq-zeit">
+            <option value="alle">Ganzes Schuljahr</option>
+            <option value="zukunft" selected>Nur anstehende</option>
+            <option value="vergangen">Nur vergangene</option>
+          </select>
+        </div>
+        <div class="list" id="sq-list" style="margin-top:12px"></div>
+      </details>
+    </section>
+
+    <section aria-labelledby="h-cal">
+      <div class="calwrap">
+        <div class="row">
+          <h2 id="h-cal">Monat</h2>
+          <div class="filters">
+            <button class="btn ghost sm" type="button" id="prev" aria-label="Vorheriger Monat">‹</button>
+            <button class="btn ghost sm" type="button" id="todayBtn">Heute</button>
+            <button class="btn ghost sm" type="button" id="next" aria-label="Nächster Monat">›</button>
+          </div>
+        </div>
+        <div class="legend"><span class="lg-ka">Klassenarbeit = ausgefüllt</span><span class="lg-t">T = Test, R = Referat (gestrichelt)</span><span>Maus drauf = Details</span></div>
+        <div class="cal" id="cal"></div>
+      </div>
+      <div class="calwrap">
+        <div class="row">
+          <h2 id="h-cal2">Hausaufgaben</h2>
+          <span class="count" id="ha-open"></span>
+        </div>
+        <div class="cal" id="cal2"></div>
+      </div>
+    </section>
+  </div>
+
+  <details class="formcard" id="formbox">
+    <summary id="h-form">Termin selbst eintragen</summary>
+    <form id="form">
+      <label>Datum<input type="date" id="f-datum" required></label>
+      <label>Fach<input id="f-fach" list="faecher" required placeholder="z. B. Mathe"></label>
+      <label>Art<select id="f-art">
+        <option>Klassenarbeit</option><option>Test</option><option>Hausaufgabe</option>
+        <option>Referat</option><option>Sonstiges</option></select></label>
+      <label>Lernzettel<select id="f-zettel">
+        <option value="offen">noch offen</option><option value="fertig">fertig</option>
+        <option value="fehlt">Material fehlt</option><option value="keiner">nicht nötig</option></select></label>
+      <label class="wide">Titel<input id="f-titel" placeholder="z. B. Lineare Funktionen"></label>
+      <label class="wide">Themen / Seiten<textarea id="f-themen" placeholder="z. B. Steigung, y-Achsenabschnitt, Buch S. 42–51"></textarea></label>
+      <div class="formacts">
+        <button class="btn" type="submit" id="save">Speichern</button>
+        <button class="btn ghost" type="button" id="cancel" hidden>Abbrechen</button>
+        <span class="note" id="formnote"></span>
+      </div>
+    </form>
+    <datalist id="faecher">
+      <option>Mathe</option><option>Deutsch</option><option>Englisch</option><option>Französisch</option><option>Spanisch</option>
+      <option>Physik</option><option>Chemie</option><option>Biologie</option><option>Geographie</option>
+      <option>Gemeinschaftskunde</option><option>WBS</option><option>Religion</option><option>Sport</option>
+    </datalist>
+  </details>
+
+  <details class="formcard" id="fotobox">
+    <summary id="h-foto">Vokabelseite fotografieren</summary>
+    <div class="fotoarea">
+      <p class="note">Foto einer Vokabelseite (oder Notizseite) aufnehmen oder hochladen. Ich lese den Text automatisch aus und mache daraus Karteikarten im passenden Fach.</p>
+      <label class="wide">Fach<input id="fo-fach" list="faecher" required placeholder="z. B. Spanisch"></label>
+      <div class="fotoacts">
+        <input type="file" id="fo-file" accept="image/*" capture="environment" hidden multiple>
+        <button class="btn" type="button" id="fo-pick">📷 Foto aufnehmen / auswählen</button>
+        <span class="note" id="fo-note"></span>
+      </div>
+      <div id="fo-preview" class="fotopreview"></div>
+      <div class="formacts" id="fo-run-wrap" hidden>
+        <button class="btn" type="button" id="fo-run">Karteikarten daraus erstellen</button>
+        <span class="note" id="fo-status"></span>
+      </div>
+      <div id="fo-result"></div>
+    </div>
+  </details>
+</div>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="p-title">
+  <article class="paper" id="paper">
+    <div class="phead">
+      <div><div class="eyebrow" id="p-eyebrow"></div><h2 id="p-title"></h2></div>
+      <button class="btn ghost sm" type="button" id="p-close">Schließen</button>
+    </div>
+    <div class="tabs" role="tablist" id="p-tabs">
+      <button type="button" role="tab" data-tab="zettel" aria-selected="true">Lernzettel</button>
+      <button type="button" role="tab" data-tab="karten" aria-selected="false">Karteikarten</button>
+      <button type="button" role="tab" data-tab="quiz" aria-selected="false">Quiz</button>
+      <button type="button" role="tab" data-tab="aufg" aria-selected="false">Übungsaufgaben</button>
+    </div>
+    <div id="p-zettel"><div class="pbody" id="p-body"></div><div class="pfoot" id="p-foot"></div></div>
+    <div class="pane" id="p-karten" hidden></div>
+    <div class="pane" id="p-quiz" hidden></div>
+    <div class="pane" id="p-aufg" hidden></div>
+  </article>
+</div>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const MON = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  const MONL = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+  const WD = ["So","Mo","Di","Mi","Do","Fr","Sa"];
+  const PRUEF = ["Klassenarbeit","Test","Referat"];
+  const ZT = {offen:"Lernzettel offen", fertig:"Lernzettel ansehen", fehlt:"Material fehlt"};
+  const FC = {mathe:"#e03131",mathematik:"#e03131",deutsch:"#1c4fd8",englisch:"#f2c200",geographie:"#8b5a2b",geo:"#8b5a2b",
+    physik:"#141414",chemie:"#6b7280",biologie:"#2f9e44",bio:"#2f9e44",spanisch:"#c4c8ce",gemeinschaftskunde:"#8ce99a",gk:"#8ce99a",
+    französisch:"#74c0fc",franzoesisch:"#74c0fc",wbs:"#f76707",religion:"#ae3ec9",ethik:"#ae3ec9",sport:"#0ca678",
+    kunst:"#e64980","bildende kunst":"#e64980",musik:"#7048e8",informatik:"#0b7285"};
+  const LIGHT = ["#f2c200","#c4c8ce","#8ce99a","#74c0fc"];
+  const textOn = c => LIGHT.includes(c) ? "#14161c" : "#fff";
+  const colorOf = f => FC[String(f||"").toLowerCase()] || "#3b5bfd";
+  let items = [], zettel = {}, db = null, editId = null, filter = "alle";
+  const now = new Date(); let view = new Date(now.getFullYear(), now.getMonth(), 1);
+  const iso = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  const todayIso = iso(now);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const daysUntil = ds => Math.round((new Date(ds+"T00:00") - new Date(todayIso+"T00:00"))/86400000);
+  const inTxt = n => n===0 ? "heute" : n===1 ? "morgen" : "in "+n+" Tagen";
+
+  // kleines Markdown: ### / ####, - Liste, **fett**, > Merke, ! Fehlt
+  function md(src){
+    const out = []; let ul = false;
+    const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\*(.+?)\*/g,"<em>$1</em>");
+    for (const raw of String(src||"").split("\n")){
+      const l = raw.trimEnd();
+      const isLi = /^\s*[-•]\s+/.test(l);
+      if (!isLi && ul){ out.push("</ul>"); ul = false; }
+      if (!l.trim()) continue;
+      if (l.startsWith("#### ")) out.push("<h4>"+inline(l.slice(5))+"</h4>");
+      else if (l.startsWith("### ")) out.push("<h3>"+inline(l.slice(4))+"</h3>");
+      else if (l.startsWith("> ")) out.push('<div class="merke">'+inline(l.slice(2))+"</div>");
+      else if (l.startsWith("! ")) out.push('<div class="fehlt">'+inline(l.slice(2))+"</div>");
+      else if (isLi){ if(!ul){out.push("<ul>"); ul = true;} out.push("<li>"+inline(l.replace(/^\s*[-•]\s+/,""))+"</li>"); }
+      else out.push("<p>"+inline(l)+"</p>");
+    }
+    if (ul) out.push("</ul>");
+    return out.join("");
+  }
+
+  function renderOverview(){
+    const up = items.filter(i => i.datum >= todayIso && PRUEF.includes(i.art)).sort((a,b)=>a.datum.localeCompare(b.datum));
+    if (up.length){ const n = daysUntil(up[0].datum); $("#ov-next").textContent = up[0].fach; $("#ov-next-s").textContent = up[0].art+" "+inTxt(n); }
+    else { $("#ov-next").textContent = "–"; $("#ov-next-s").textContent = "Keine anstehenden Prüfungen"; }
+    $("#ov-two").textContent = up.filter(i => daysUntil(i.datum) <= 14).length;
+    const need = up.filter(i => i.lernzettel !== "keiner"); const done = need.filter(i => i.lernzettel === "fertig").length;
+    $("#ov-z").textContent = done+" / "+need.length;
+    $("#ov-bar").style.width = need.length ? Math.round(done/need.length*100)+"%" : "0%";
+  }
+
+  function renderList(){
+    const el = $("#list");
+    let up = items.filter(i => i.datum >= todayIso);
+    if (filter === "pruef") up = up.filter(i => PRUEF.includes(i.art));
+    if (filter === "ha") up = up.filter(i => i.art === "Hausaufgabe");
+    up.sort((a,b) => a.datum.localeCompare(b.datum));
+    if (!up.length){ el.innerHTML = '<p class="empty">'+(items.length ? "Nichts Anstehendes in diesem Filter." : "Noch nichts eingetragen. Unten den ersten Termin hinzufügen.")+'</p>'; return; }
+    el.innerHTML = up.slice(0,30).map(i => {
+      const d = new Date(i.datum+"T00:00"), n = daysUntil(i.datum);
+      const z = i.lernzettel, has = !!zettel[i.id];
+      const ha = i.art === "Hausaufgabe";
+      const zBtn = has ? '<button type="button" class="zs fertig" data-open="'+esc(i.id)+'">'+(ha ? 'Lösung zum Vergleichen' : 'Lernen: Zettel · Karten · Quiz')+'</button>'
+        : (z==="fehlt" ? '<span class="zs fehlt">'+(ha?'Aufgabe/Material fehlt':'Material fehlt')+'</span>' : z==="keiner" ? '' : '<span class="zs offen">'+(ha?'Lösung kommt':'Lernzettel kommt')+'</span>');
+      return '<div class="item" data-id="'+esc(i.id)+'" style="--fc:'+colorOf(i.fach)+'"><div class="date"><span class="wd">'+WD[d.getDay()]+'</span><span class="d">'+d.getDate()+'</span><span class="m">'+MON[d.getMonth()]+'</span></div>'+
+        '<div><div class="top"><span class="fach">'+esc(i.fach)+'</span><span class="chip'+(i.art==="Klassenarbeit"?' ka':i.art==="Test"?' test':i.art==="Referat"?' ref':'')+'">'+esc(i.art==="Test" && i.titel ? i.titel : i.art)+'</span><span class="in'+(n<=3?' soon':'')+'">'+inTxt(n)+'</span></div>'+
+        (i.titel ? '<div>'+esc(i.titel)+'</div>' : '')+(i.themen ? '<div class="sub">'+esc(i.themen)+'</div>' : '')+
+        '<div class="acts">'+zBtn+(ha ? '<button type="button" class="zs '+(i.erledigt?'fertig':'offen')+'" data-done="'+esc(i.id)+'">'+(i.erledigt?'✓ Erledigt':'Als erledigt markieren')+'</button>' : '')+'<button class="link" data-edit="'+esc(i.id)+'">Bearbeiten</button><button class="link" data-del="'+esc(i.id)+'">Löschen</button></div></div></div>';
+    }).join("");
+  }
+
+  function renderCal(){
+    $("#h-cal").textContent = MONL[view.getMonth()]+" "+view.getFullYear();
+    $("#h-cal2").textContent = "Hausaufgaben · "+MONL[view.getMonth()];
+    const open = items.filter(i => i.art==="Hausaufgabe" && !i.erledigt && i.datum >= todayIso).length;
+    $("#ha-open").textContent = open ? open+" offen" : "alles erledigt";
+    drawCal("#cal", i => i.art !== "Hausaufgabe", true);
+    drawCal("#cal2", i => i.art === "Hausaufgabe", false);
+  }
+  const artColor = a => a==="Klassenarbeit" ? "var(--ka)" : a==="Test" ? "var(--test)" : a==="Referat" ? "var(--ref)" : "var(--muted)";
+  function drawCal(sel, keep, byArt){
+    const off = (view.getDay()+6)%7; const start = new Date(view); start.setDate(1-off);
+    const last = new Date(view.getFullYear(), view.getMonth()+1, 0); const cells = Math.ceil((off+last.getDate())/7)*7;
+    let html = ["Mo","Di","Mi","Do","Fr","Sa","So"].map(w => '<div class="wdh">'+w+'</div>').join("");
+    for (let k=0;k<cells;k++){
+      const d = new Date(start); d.setDate(start.getDate()+k); const ds = iso(d);
+      const evs = items.filter(i => i.datum === ds && keep(i));
+      html += '<button type="button" class="day'+(d.getMonth()!==view.getMonth()?' out':'')+(ds===todayIso?' today':'')+'" data-day="'+ds+'" aria-label="'+d.getDate()+'. '+MONL[d.getMonth()]+(evs.length?', '+evs.length+' Einträge':'')+'"><span class="n">'+d.getDate()+'</span>'+
+        evs.map(e => '<span class="ev'+(e.erledigt?' done':'')+(byArt && e.art!=="Klassenarbeit"?' test':'')+'" data-id="'+esc(e.id)+'" style="--fc:'+colorOf(e.fach)+';--ft:'+textOn(colorOf(e.fach))+'" title="'+esc(e.fach+": "+e.art+(e.titel?" – "+e.titel:""))+'">'+(byArt && e.art==="Test"?'<b>T</b> ':byArt && e.art==="Referat"?'<b>R</b> ':'')+esc(e.fach)+'</span>').join("")+'</button>';
+    }
+    $(sel).innerHTML = html;
+  }
+  const render = () => { renderOverview(); renderBrief(); renderList(); renderCal(); renderSearch(); };
+
+  let brief = {};
+  const BFACH = ["Mathe","Deutsch","Spanisch","Englisch","Französisch"];
+  const bkey = f => "fach-"+f.toLowerCase().replace("ö","oe");
+  $("#brief-toggle").addEventListener("click", () => {
+    const b = $("#brief-toggle"), body = $("#brief-body");
+    const open = b.getAttribute("aria-expanded") === "true";
+    b.setAttribute("aria-expanded", String(!open)); body.hidden = open;
+  });
+  function renderBrief(){
+    const el = $("#brief-body"); if (!el) return;
+    const tm = iso(new Date(now.getFullYear(), now.getMonth(), now.getDate()+1));
+    const live = items.filter(i => (i.datum===todayIso || i.datum===tm) && !i.erledigt).sort((a,b)=>a.datum.localeCompare(b.datum));
+    const t = brief.tag || {};
+    const liveHtml = live.map(i => '<li><b>'+(i.datum===todayIso?'Heute':'Morgen')+'</b> · '+esc(i.fach)+': '+esc(i.art)+(i.titel?' – '+esc(i.titel):'')+'</li>').join("");
+    const pts = (t.punkte||[]).map(p => '<li>'+esc(p.text)+(p.quelle?' <span class="src">'+esc(p.quelle)+'</span>':'')+'</li>').join("");
+    $("#brief-stand").textContent = t.stand ? "Stand: "+t.stand : "";
+    const fach = BFACH.map(f => {
+      const d = brief[bkey(f)];
+      const body = d ? '<p><b>Letzte Stunde:</b> '+esc(d.letzte||"–")+'</p>'+((d.gemacht||[]).length?'<ul>'+d.gemacht.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>':'')+(d.fazit?'<p class="fazit"><b>Fazit:</b> '+esc(d.fazit)+'</p>':'')
+        : '<p class="note">Noch kein Briefing für dieses Fach.</p>';
+      return '<div class="bf" style="--fc:'+colorOf(f)+'"><div class="bf-h"><span>'+esc(f)+'</span><span class="src">'+esc((d&&d.stand)||"")+'</span></div>'+body+'</div>';
+    }).join("");
+    el.innerHTML = '<div class="bnow"><h3>Wichtig jetzt</h3>'+((liveHtml||pts)?'<ul>'+liveHtml+pts+'</ul>':'<p class="note">Noch kein Briefing. Sag Claude: „Briefing aktualisieren“.</p>')+'</div><div class="bfach">'+fach+'</div>';
+  }
+
+  function fillFachOptions(){
+    const sel = $("#sq-fach"); if (!sel || sel.dataset.filled) return;
+    const set = new Set(items.map(i => i.fach).filter(Boolean));
+    [...set].sort((a,b)=>a.localeCompare(b,"de")).forEach(f => { const o=document.createElement("option"); o.value=f; o.textContent=f; sel.appendChild(o); });
+    if (set.size) sel.dataset.filled = "1";
+  }
+  function renderSearch(){
+    const el = $("#sq-list"); if (!el) return;
+    fillFachOptions();
+    const txt = ($("#sq-text").value||"").trim().toLowerCase();
+    const fach = $("#sq-fach").value;
+    const artSel = $("#sq-art").value;
+    const zeit = $("#sq-zeit").value;
+    const arten = artSel ? [artSel] : ["Klassenarbeit","Test","Referat"];
+    let list = items.filter(i => arten.includes(i.art));
+    if (fach) list = list.filter(i => i.fach === fach);
+    if (zeit === "zukunft") list = list.filter(i => i.datum >= todayIso);
+    else if (zeit === "vergangen") list = list.filter(i => i.datum < todayIso);
+    if (txt) list = list.filter(i => [i.fach,i.art,i.titel,i.themen].filter(Boolean).join(" ").toLowerCase().includes(txt));
+    list.sort((a,b) => a.datum.localeCompare(b.datum));
+    if (!list.length){ el.innerHTML = '<p class="empty">Keine Treffer.</p>'; return; }
+    el.innerHTML = list.map(i => {
+      const d = new Date(i.datum+"T00:00"); const n = daysUntil(i.datum); const has = !!zettel[i.id];
+      return '<div class="item" data-id="'+esc(i.id)+'" style="--fc:'+colorOf(i.fach)+'"><div class="date"><span class="wd">'+WD[d.getDay()]+'</span><span class="d">'+d.getDate()+'</span><span class="m">'+MON[d.getMonth()]+'</span></div>'+
+        '<div><div class="top"><span class="fach">'+esc(i.fach)+'</span><span class="chip'+(i.art==="Klassenarbeit"?' ka':i.art==="Test"?' test':' ref')+'">'+esc(i.art==="Test" && i.titel ? i.titel : i.art)+'</span><span class="in'+(i.datum>=todayIso && n<=3?' soon':'')+'">'+(i.datum>=todayIso?inTxt(n):d.toLocaleDateString("de-DE",{day:"numeric",month:"short"}))+'</span></div>'+
+        (i.titel ? '<div>'+esc(i.titel)+'</div>' : '')+(i.themen ? '<div class="sub">'+esc(i.themen)+'</div>' : '')+
+        (has ? '<div class="acts"><button type="button" class="zs fertig" data-open="'+esc(i.id)+'">Lernen: Zettel · Karten · Quiz</button></div>' : '')+'</div></div>';
+    }).join("");
+  }
+  ["sq-text","sq-fach","sq-art","sq-zeit"].forEach(id => { document.addEventListener("input", e => { if (e.target.id===id) renderSearch(); }); document.addEventListener("change", e => { if (e.target.id===id) renderSearch(); }); });
+
+  function openSheet(id){
+    const i = items.find(x => x.id === id), z = zettel[id]; if (!i || !z) return;
+    $("#paper").style.setProperty("--fc", colorOf(i.fach));
+    $("#p-eyebrow").textContent = i.fach+" · "+i.art+(i.art==="Hausaufgabe"?" bis ":" am ")+new Date(i.datum+"T00:00").toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"});
+    $("#p-title").textContent = z.titel || ("Lernzettel "+i.fach);
+    const isHa = i.art === "Hausaufgabe";
+    document.querySelector('#p-tabs [data-tab="zettel"]').textContent = isHa ? "Lösung" : "Lernzettel";
+    document.querySelector('#p-tabs [data-tab="karten"]').hidden = isHa && !(z.karten||[]).length;
+    document.querySelector('#p-tabs [data-tab="quiz"]').hidden = isHa && !(z.quiz||[]).length;
+    document.querySelector('#p-tabs [data-tab="aufg"]').hidden = !(z.aufgaben||[]).length;
+    $("#p-body").innerHTML = md(z.inhalt);
+    $("#p-foot").textContent = z.quelle ? "Quelle: "+z.quelle : "";
+    cur = { z, karten: shuffle((z.karten||[]).slice()), ki: 0, flipped: false, again: [], quiz: shuffle((z.quiz||[]).slice()), qi: 0, pts: 0, answered: false,
+      aufgaben: (z.aufgaben||[]).map(a => ({a, val:"", checked:false, ok:null})) };
+    renderKarten(); renderQuiz(); renderAufgaben(); showTab("zettel");
+    $("#sheet").hidden = false; $("#p-close").focus();
+  }
+  let cur = null;
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+  function showTab(t){
+    document.querySelectorAll("#p-tabs [data-tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.tab===t));
+    $("#p-zettel").hidden = t!=="zettel"; $("#p-karten").hidden = t!=="karten"; $("#p-quiz").hidden = t!=="quiz"; $("#p-aufg").hidden = t!=="aufg";
+  }
+  function numEq(a,b){
+    const pa = parseFloat(String(a).replace(",",".").replace(/[^0-9.\-]/g,""));
+    const pb = parseFloat(String(b).replace(",",".").replace(/[^0-9.\-]/g,""));
+    if (isNaN(pa) || isNaN(pb)) return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+    return Math.abs(pa-pb) < Math.max(0.01, Math.abs(pb)*0.01);
+  }
+  function renderAufgaben(){
+    const el = $("#p-aufg");
+    if (!cur.aufgaben.length){ el.innerHTML = '<p class="empty">Für dieses Fach gibt es noch keine Übungsaufgaben.</p>'; return; }
+    const allChecked = cur.aufgaben.every(x => x.checked);
+    el.innerHTML = '<div class="aufg">'+cur.aufgaben.map((x,i) => {
+      const a = x.a;
+      return '<div class="frage'+(x.checked?' done':'')+'" data-ai="'+i+'"><div class="fn">Aufgabe '+(i+1)+(a.quelle?' · '+esc(a.quelle):'')+'</div><div class="ft">'+esc(a.f)+'</div>'+
+        '<input type="text" inputmode="decimal" placeholder="Ergebnis eingeben" data-ain="'+i+'" value="'+esc(x.val)+'" '+(x.checked?'disabled':'')+'>'+
+        (!x.checked ? '<button class="btn sm" type="button" data-acheck="'+i+'" style="margin-left:8px">Prüfen</button>' : '')+
+        '<div class="result '+(x.checked ? (x.ok?'ok':'bad') : '')+'">'+(x.checked ? '<strong>'+(x.ok?'Richtig.':'Nicht ganz.')+'</strong> Lösung: '+esc(a.l)+(a.weg?'<div class="weg">'+esc(a.weg)+'</div>':'') : '')+'</div></div>';
+    }).join("")+
+    (allChecked ? '<div class="score">'+cur.aufgaben.filter(x=>x.ok).length+' / '+cur.aufgaben.length+'</div>' : '')+
+    '<div class="formacts"><button class="btn ghost" type="button" data-arestart="1">Alle zurücksetzen</button></div></div>';
+  }
+  function renderKarten(){
+    const el = $("#p-karten");
+    if (!cur.karten.length){ el.innerHTML = '<p class="empty">Für dieses Fach gibt es noch keine Karteikarten.</p>'; return; }
+    if (cur.ki >= cur.karten.length){
+      if (cur.again.length){ cur.karten = shuffle(cur.again); cur.again = []; cur.ki = 0; }
+      else { el.innerHTML = '<div class="flash"><div class="score">Geschafft!</div><p class="count">Alle Karten gewusst.</p><button class="btn" type="button" data-k="restart">Nochmal von vorn</button></div>'; return; }
+    }
+    const k = cur.karten[cur.ki];
+    el.innerHTML = '<div class="flash"><div class="count">Karte '+(cur.ki+1)+' von '+cur.karten.length+(cur.again.length?' · '+cur.again.length+' zum Wiederholen':'')+'</div>'+
+      '<button type="button" class="card'+(cur.flipped?' back':'')+'" data-k="flip"><span><small>'+(cur.flipped?'Antwort':'Frage · antippen zum Umdrehen')+'</small>'+(cur.flipped?md(k.r):esc(k.v))+'</span></button>'+
+      (cur.flipped ? '<div class="cardnav"><button class="btn again" type="button" data-k="again">Nochmal</button><button class="btn good" type="button" data-k="good">Gewusst</button></div>' : '')+'</div>';
+  }
+  function renderQuiz(){
+    const el = $("#p-quiz");
+    if (!cur.quiz.length){ el.innerHTML = '<p class="empty">Für dieses Fach gibt es noch kein Quiz.</p>'; return; }
+    if (cur.qi >= cur.quiz.length){
+      el.innerHTML = '<div class="flash"><div class="score">'+cur.pts+' / '+cur.quiz.length+'</div><p class="count">'+(cur.pts===cur.quiz.length?'Perfekt!':cur.pts>=cur.quiz.length*0.7?'Gut, die Fehler nochmal im Lernzettel anschauen.':'Lies den Lernzettel nochmal und versuch es erneut.')+'</p><button class="btn" type="button" data-q="restart">Quiz neu starten</button></div>'; return;
+    }
+    const q = cur.quiz[cur.qi];
+    el.innerHTML = '<div class="q"><div class="count">Frage '+(cur.qi+1)+' von '+cur.quiz.length+' · '+cur.pts+' richtig</div><h3>'+esc(q.f)+'</h3>'+
+      q.a.map((a,i) => '<button type="button" class="opt" data-q="ans" data-i="'+i+'">'+esc(a)+'</button>').join("")+'<div id="q-after"></div></div>';
+  }
+  function answer(i){
+    if (cur.answered) return; cur.answered = true;
+    const q = cur.quiz[cur.qi]; const ok = i === q.k; if (ok) cur.pts++;
+    document.querySelectorAll("#p-quiz .opt").forEach((b,j) => { b.disabled = true; if (j===q.k) b.classList.add("right"); else if (j===i) b.classList.add("wrong"); });
+    $("#q-after").innerHTML = '<div class="expl"><strong>'+(ok?'Richtig. ':'Leider falsch. ')+'</strong>'+esc(q.e||"")+'</div><div class="cardnav" style="margin-top:12px"><button class="btn" type="button" data-q="next">Weiter</button></div>';
+  }
+  $("#sheet").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b || !cur) return;
+    if (b.dataset.tab) showTab(b.dataset.tab);
+    if (b.dataset.k === "flip"){ cur.flipped = !cur.flipped; renderKarten(); }
+    if (b.dataset.k === "good"){ cur.ki++; cur.flipped = false; renderKarten(); }
+    if (b.dataset.k === "again"){ cur.again.push(cur.karten[cur.ki]); cur.ki++; cur.flipped = false; renderKarten(); }
+    if (b.dataset.k === "restart"){ cur.karten = shuffle((cur.z.karten||[]).slice()); cur.ki = 0; cur.again = []; cur.flipped = false; renderKarten(); }
+    if (b.dataset.q === "ans") answer(+b.dataset.i);
+    if (b.dataset.q === "next"){ cur.qi++; cur.answered = false; renderQuiz(); }
+    if (b.dataset.q === "restart"){ cur.quiz = shuffle((cur.z.quiz||[]).slice()); cur.qi = 0; cur.pts = 0; cur.answered = false; renderQuiz(); }
+    if (b.dataset.acheck !== undefined){
+      const i = +b.dataset.acheck, x = cur.aufgaben[i];
+      const input = document.querySelector('[data-ain="'+i+'"]');
+      x.val = input ? input.value : ""; x.checked = true; x.ok = numEq(x.val, x.a.l);
+      renderAufgaben();
+    }
+    if (b.dataset.arestart){ cur.aufgaben.forEach(x => { x.val=""; x.checked=false; x.ok=null; }); renderAufgaben(); }
+  });
+  $("#p-aufg").addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.matches("[data-ain]")){
+      e.preventDefault();
+      const i = +e.target.dataset.ain;
+      document.querySelector('[data-acheck="'+i+'"]')?.click();
+    }
+  });
+  const closeSheet = () => { $("#sheet").hidden = true; };
+
+  function resetForm(){ $("#form").reset(); editId = null; $("#save").textContent = "Speichern"; $("#cancel").hidden = true; $("#f-datum").value = todayIso; }
+
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#sheet").hidden) closeSheet(); });
+  $("#sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeSheet(); });
+
+  document.addEventListener("click", async e => {
+    const evEl = e.target.closest(".ev[data-id]");
+    if (evEl && zettel[evEl.dataset.id]) return openSheet(evEl.dataset.id);
+    const t = e.target.closest("button");
+    if (t && t.dataset.done){ const it = items.find(x => x.id === t.dataset.done); if (it && db){ try { await db.collection("eintraege").doc(it.id).update({erledigt: !it.erledigt}); } catch(err){ $("#formnote").textContent = "Speichern hat nicht geklappt."; } } return; }
+    if (!t){ const it = e.target.closest(".item[data-id]"); if (it && zettel[it.dataset.id]) openSheet(it.dataset.id); return; }
+    if (t.closest("#sheet") && t.id !== "p-close") return;
+    if (t.id === "p-close") return closeSheet();
+    if (t.dataset.open) return openSheet(t.dataset.open);
+    if (t.dataset.f){ filter = t.dataset.f; document.querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-pressed", b===t)); renderList(); }
+    if (t.dataset.day){ $("#f-datum").value = t.dataset.day; $("#f-fach").focus(); }
+    if (t.dataset.edit){ const i = items.find(x => x.id === t.dataset.edit); if (!i) return; editId = i.id;
+      $("#f-datum").value=i.datum; $("#f-fach").value=i.fach; $("#f-art").value=i.art; $("#f-zettel").value=i.lernzettel||"offen";
+      $("#f-titel").value=i.titel||""; $("#f-themen").value=i.themen||""; $("#save").textContent="Änderung speichern"; $("#cancel").hidden=false; $("#f-fach").focus(); }
+    if (t.dataset.del){
+      if (t.dataset.confirm !== "1"){ t.dataset.confirm = "1"; t.textContent = "Wirklich löschen?"; return; }
+      try { await db.collection("eintraege").doc(t.dataset.del).delete(); } catch(err){ $("#formnote").textContent = "Löschen hat nicht geklappt."; }
+    }
+    if (t.id === "prev"){ view.setMonth(view.getMonth()-1); renderCal(); }
+    if (t.id === "next"){ view.setMonth(view.getMonth()+1); renderCal(); }
+    if (t.id === "todayBtn"){ view = new Date(now.getFullYear(), now.getMonth(), 1); renderCal(); }
+    if (t.id === "cancel") resetForm();
+  });
+
+  $("#form").addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!db){ $("#formnote").textContent = "Speichern geht hier gerade nicht. Seite in Claude öffnen und angemeldet sein."; return; }
+    const prev = editId ? items.find(x => x.id === editId) : null;
+    const data = Object.assign({}, prev ? {quelle: prev.quelle || ""} : {}, { datum:$("#f-datum").value, fach:$("#f-fach").value.trim(), art:$("#f-art").value,
+      lernzettel:$("#f-zettel").value, titel:$("#f-titel").value.trim(), themen:$("#f-themen").value.trim() });
+    $("#save").disabled = true;
+    try {
+      if (editId) await db.collection("eintraege").doc(editId).set(data);
+      else await db.collection("eintraege").add(data);
+      $("#formnote").textContent = "Gespeichert."; resetForm();
+    } catch(err){ $("#formnote").textContent = "Speichern hat nicht geklappt. Bitte nochmal versuchen."; }
+    $("#save").disabled = false;
+  });
+
+  resetForm(); render();
+
+  (async () => {
+    db = await (window.claude?.use ? window.claude.use("db") : null);
+    if (!db){ $("#status").textContent = "Nur Ansicht: Speichern ist hier nicht verfügbar."; return; }
+    const timer = setTimeout(() => { $("#status").textContent = "Daten noch nicht erreichbar …"; }, 10000);
+    db.collection("eintraege").onSnapshot(snap => {
+      items = snap.docs.map(d => ({ id:d.id, ...d.data() })).filter(i => i.datum);
+      if (!snap.metadata.fromCache){ clearTimeout(timer); $("#status").textContent = items.length+" Einträge"; }
+      render();
+    }, () => { clearTimeout(timer); $("#status").textContent = "Daten nicht erreichbar."; });
+    db.collection("lernzettel").onSnapshot(snap => {
+      zettel = {}; snap.docs.forEach(d => { zettel[d.id] = d.data(); }); renderList();
+    }, () => {});
+    db.collection("briefing").onSnapshot(snap => {
+      brief = {}; snap.docs.forEach(d => { brief[d.id] = d.data(); }); renderBrief();
+    }, () => {});
+  })();
+
+  // --- Vokabelseite fotografieren ---
+  (function(){
+    let fotos = []; // {blob, url}
+    let assets = null, sample = null;
+    (async () => {
+      assets = window.claude?.use ? await window.claude.use("assets") : null;
+      sample = window.claude?.use ? await window.claude.use("sample") : null;
+      if (!assets || !sample) $("#fo-note").textContent = "Fotofunktion hier nicht verfügbar (nur in Claude verfügbar).";
+    })();
+
+    $("#fo-pick").addEventListener("click", () => $("#fo-file").click());
+    $("#fo-file").addEventListener("change", () => {
+      const files = [...$("#fo-file").files];
+      files.forEach(f => fotos.push({ blob: f, url: URL.createObjectURL(f) }));
+      renderFotoPreview();
+      $("#fo-file").value = "";
+    });
+    function renderFotoPreview(){
+      $("#fo-preview").innerHTML = fotos.map((f,i) => '<div class="fo-thumb"><img src="'+f.url+'" alt="Foto '+(i+1)+'"><button type="button" data-rm="'+i+'" aria-label="Entfernen">✕</button></div>').join("");
+      $("#fo-run-wrap").hidden = fotos.length === 0;
+    }
+    $("#fo-preview").addEventListener("click", e => {
+      const b = e.target.closest("button[data-rm]"); if (!b) return;
+      fotos.splice(+b.dataset.rm, 1); renderFotoPreview();
+    });
+
+    $("#fo-run").addEventListener("click", async () => {
+      const fach = $("#fo-fach").value.trim();
+      if (!fach){ $("#fo-status").textContent = "Bitte zuerst ein Fach angeben."; return; }
+      if (!assets || !sample){ $("#fo-status").textContent = "Fotofunktion hier nicht verfügbar."; return; }
+      $("#fo-run").disabled = true;
+      $("#fo-status").innerHTML = '<span class="spin"></span>Lese Fotos aus …';
+      $("#fo-result").innerHTML = "";
+      try {
+        const uploaded = [];
+        for (const f of fotos){ const up = await assets.upload(f.blob); uploaded.push(up); }
+        const rechenfach = /mathe|physik|chemie/i.test(fach);
+        const prompt = "Das sind Fotos einer Vokabel-, Notiz- oder Übungsseite für das Schulfach '"+fach+"'. "+
+          "Lies den Text so genau wie möglich aus (auch handschriftlich). Erstelle daraus Karteikarten (Vorderseite = Begriff/Frage, Rückseite = Übersetzung/Antwort) "+
+          "und ein paar Multiple-Choice-Quizfragen."+
+          (rechenfach ? " Wenn Rechen-/Textaufgaben auf dem Foto zu sehen sind (auch unvollständig gelöste), erstelle zusätzlich 3-6 passende ÜBUNGSAUFGABEN zum selbst Nachrechnen: ähnliche Aufgaben zum gleichen Thema mit numerischem Ergebnis, plus Lösungsweg in Kurzform." : "")+
+          " Antworte NUR mit JSON in genau dieser Form, ohne Erklärtext drumherum:\n"+
+          '{"titel":"kurzer Titel der Seite","inhalt":"kurze Zusammenfassung als Markdown mit - Listen und **fett**","karten":[{"v":"Frage/Begriff","r":"Antwort/Übersetzung"}],"quiz":[{"f":"Frage","a":["Option1","Option2","Option3","Option4"],"k":0,"e":"Erklärung"}]'+
+          (rechenfach ? ',"aufgaben":[{"f":"Aufgabentext","l":"nur das numerische Endergebnis, z.B. 12.5","weg":"kurzer Rechenweg in 2-4 Schritten","quelle":"optional z.B. S.37 Nr.2"}]' : "")+'}';
+        const imgs = [];
+        for (const f of fotos) imgs.push(f.blob);
+        const res = await sample(prompt, { images: imgs });
+        let txt = (res.text || "").trim();
+        const m = txt.match(/\{[\s\S]*\}/);
+        if (m) txt = m[0];
+        const data = JSON.parse(txt);
+        data.quelle = "Foto, von dir aufgenommen am "+new Date().toLocaleDateString("de-DE");
+        data.fach = fach;
+        data._assetIds = uploaded.map(u => u.id);
+
+        $("#fo-status").textContent = "";
+        $("#fo-result").innerHTML = '<div class="fo-sheet"><h3>'+esc(data.titel||"Vorschau")+'</h3>'+
+          '<p class="note">'+(data.karten||[]).length+' Karteikarten, '+(data.quiz||[]).length+' Quizfragen erkannt.</p>'+
+          '<ul>'+(data.karten||[]).slice(0,5).map(k => '<li><strong>'+esc(k.v)+'</strong> — '+esc(k.r)+'</li>').join("")+'</ul>'+
+          '<div class="formacts"><button class="btn" type="button" id="fo-save">Als Lernzettel speichern</button></div></div>';
+        $("#fo-save").addEventListener("click", async () => {
+          if (!db){ $("#fo-status").textContent = "Speichern geht hier gerade nicht."; return; }
+          $("#fo-save").disabled = true;
+          try {
+            const entry = await db.collection("eintraege").add({ datum: todayIso, fach, art: "Sonstiges", lernzettel: "fertig", titel: data.titel||"", themen: "Aus Foto erstellt" });
+            await db.collection("lernzettel").doc(entry.id).set({ titel: data.titel||"", inhalt: data.inhalt||"", karten: data.karten||[], quiz: data.quiz||[], aufgaben: data.aufgaben||[], quelle: data.quelle });
+            $("#fo-status").textContent = "Gespeichert! Du findest den Lernzettel jetzt bei \""+fach+"\".";
+            fotos = []; renderFotoPreview(); $("#fo-fach").value = ""; $("#fo-result").innerHTML = "";
+          } catch(err){ $("#fo-status").textContent = "Speichern hat nicht geklappt."; }
+          $("#fo-save").disabled = false;
+        });
+      } catch(err){
+        $("#fo-status").textContent = "Auslesen hat nicht geklappt. Bitte nochmal versuchen (oder deutlicheres Foto).";
+      }
+      $("#fo-run").disabled = false;
+    });
+  })();
+})();
+</script>
+
+</body></html>
